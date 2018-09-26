@@ -1,0 +1,197 @@
+import os
+import time
+import io
+import json
+from flask import Flask, render_template
+from flask import request, make_response, jsonify 
+from werkzeug import secure_filename
+from werkzeug.datastructures import ImmutableMultiDict
+import database
+import threading
+from time import sleep
+
+supported_oper_list = ['addImages', 'addVideo']
+  
+SAVE_WORK_DIR = "saved_images"
+
+SAVE_WORK_DIR2 = "saved_video"
+
+app = Flask(__name__)
+
+
+def setInterval(func,time):
+	e=threading.Event()
+	while not e.wait(time):
+		func()
+
+def foo():
+	print (time.time())
+
+setInterval(foo,1/1000)
+
+ 
+@app.route('/v1/projectbserver/images', methods=['POST', 'PUT', 'GET'])
+def projectbserverimages():
+	if request.method == 'POST':
+		#print ('Post call received for multi..!')
+        
+		#Some level of sanity check		
+		oper_obj = json.loads(request.form.get("operation"))	  
+		print (oper_obj)     
+		
+		# Retrive Device name From the headers and make a new directory 
+		project_secret_key = request.headers.get('Device-Name')
+		print(project_secret_key)		
+		SAVE_WORK_DIR = "saved_images_"+project_secret_key
+
+		# Retrive Timestamp value to push into the database 
+		project_secret_ts = request.headers.get('Time-Stamp')
+		print(project_secret_ts)		
+		
+		if (not oper_obj) or (not oper_obj["operation"]) or (oper_obj["operation"] not in supported_oper_list):
+
+			
+			return jsonify({
+
+			'status': 'unsupported'
+
+			})
+		print(oper_obj['operation'])
+	
+		if oper_obj['operation'] == 'addImages':
+			if not os.path.exists(SAVE_WORK_DIR):
+				os.makedirs(SAVE_WORK_DIR)
+
+			CWD = os.path.dirname(os.path.realpath(__file__))
+						
+
+			#Iterate through list of files
+
+			iterate = True
+			files = request.files
+			size = len(files)
+			files_created = []
+			files_to_classify = []
+			length = len(files)
+			print(length)
+
+			next_file_id = 1
+
+			while length > 0:
+				next_file = request.files[str(next_file_id)]
+				print("-->  nextfile",  next_file.filename)
+				new_file_path = os.path.join(CWD, SAVE_WORK_DIR, next_file.filename)
+				next_file.save(new_file_path)
+			
+				#reading values like Device name and time stamp from the client creating database dynamically and 					storing the required field information into it 
+
+				database.main_file(project_secret_key,  project_secret_ts,new_file_path) 
+				
+				next_file_id = next_file_id+1 
+				length = length -1
+				print ("\n ",length)			
+			
+		else:
+			print ('Invalid operation key')
+
+
+
+	       
+		#os.path.getsize(new_file_path)
+		print ('FILE SAVED LOCALY')
+
+
+
+		#Dummy response
+
+		return jsonify({
+
+			'status': 'success'
+
+		})
+
+
+
+
+
+@app.route('/v1/projectbserver/video', methods=['POST', 'PUT', 'GET'])
+def projectbservervideo():
+	if request.method == 'POST':
+		#print ('Post call received for multi..!')        
+		
+		#Some level of sanity check		
+		oper_obj = json.loads(request.form.get("operation"))	  
+		print (oper_obj)     
+		
+		# Retrive Device name From the headers and make a new directory 
+		project_secret_key = request.headers.get('Device-Name')
+		print(project_secret_key)		
+		SAVE_WORK_DIR2 = "saved_video_"+project_secret_key
+
+		# Retrive Timestamp value to push into the database 
+		project_secret_ts = request.headers.get('Time-Stamp')
+		print(project_secret_ts)		
+		
+		if (not oper_obj) or (not oper_obj["operation"]) or (oper_obj["operation"] not in supported_oper_list):
+
+			
+			return jsonify({
+
+			'status': 'unsupported'
+
+			})
+		print(oper_obj['operation'])
+	
+		if oper_obj['operation'] == 'addVideo':
+			if not os.path.exists(SAVE_WORK_DIR2):
+				os.makedirs(SAVE_WORK_DIR2)
+
+			CWD = os.path.dirname(os.path.realpath(__file__))
+						
+
+			#Iterate through list of files
+
+			iterate = True
+			files = request.files
+			size = len(files)
+			files_created = []
+			files_to_classify = []
+			length = len(files)
+			print(length)
+
+			next_file_id = 1
+
+			while length > 0:
+				next_file = request.files[str(next_file_id)]
+				print("-->  nextfile",  next_file.filename)
+				new_file_path = os.path.join(CWD, SAVE_WORK_DIR2, next_file.filename)
+				next_file.save(new_file_path)
+				
+				
+				next_file_id = next_file_id+1 
+				length = length -1
+				print ("\n ",length)			
+			
+		else:
+			print ('Invalid operation key')
+
+
+
+	       
+		#os.path.getsize(new_file_path)
+		print ('FILE SAVED LOCALY')
+
+
+
+		#Dummy response
+
+		return jsonify({
+
+			'status': 'success'
+
+		})
+
+
+
+if __name__ == '__main__':    
+    app.run(debug=True, host='192.168.1.200', port= 5100)
